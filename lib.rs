@@ -1,5 +1,7 @@
 use core::pin::Pin;
 
+pub mod ring_buffer;
+
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct GreekOut {
