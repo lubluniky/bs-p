@@ -74,6 +74,22 @@ fn main() {
 }
 ```
 
+## Benchmark Snapshot
+
+```text
+============================================================
+ POLYMARKET-KERNEL RAW BENCHMARK
+============================================================
+ Quote Batch Size        :       8192 markets
+ Quote Iterations        :     100000
+ AVX-512 Quote Latency   :       6.71 ns/market
+------------------------------------------------------------
+ SPSC Ring Capacity      :    1048576
+ SPSC Messages           :   10000000
+ SPSC Throughput         :      29.05 M msgs/sec
+============================================================
+```
+
 ## License
 
 MIT
