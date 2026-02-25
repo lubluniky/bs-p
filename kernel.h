@@ -8,22 +8,6 @@ extern "C" {
 #endif
 
 typedef struct {
-    _Alignas(64) double x_t;
-    double q_t;
-    double sigma_b;
-    double gamma;
-    double tau;
-    double k;
-    double reserved0;
-    double reserved1;
-} market_state_t;
-
-typedef struct {
-    double bid_p;
-    double ask_p;
-} quote_out_t;
-
-typedef struct {
     double delta_x;
     double gamma_x;
 } greek_out_t;
@@ -38,8 +22,14 @@ void kernel_greeks_from_logit(double x, double *delta_x, double *gamma_x);
 void kernel_greeks_batch(const double *x, greek_out_t *out, size_t n);
 
 void calculate_quotes_logit(
-    const market_state_t *states,
-    quote_out_t *quotes,
+    const double *x_t,
+    const double *q_t,
+    const double *sigma_b,
+    const double *gamma,
+    const double *tau,
+    const double *k,
+    double *bid_p,
+    double *ask_p,
     size_t n
 );
 
