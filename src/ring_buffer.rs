@@ -46,7 +46,8 @@ pub enum RingInitError {
 }
 
 unsafe extern "C" {
-    fn spsc_ring_buffer_init(rb: *mut SpscRingBuffer, slots: *mut L2Update, capacity: u64) -> c_int;
+    fn spsc_ring_buffer_init(rb: *mut SpscRingBuffer, slots: *mut L2Update, capacity: u64)
+    -> c_int;
     fn spsc_ring_buffer_push(rb: *mut SpscRingBuffer, msg: *const L2Update) -> c_int;
     fn spsc_ring_buffer_pop(rb: *mut SpscRingBuffer, out: *mut L2Update) -> c_int;
     fn spsc_ring_buffer_capacity(rb: *const SpscRingBuffer) -> u64;
@@ -73,7 +74,8 @@ pub fn split<'a>(
         return Err(RingInitError::InvalidCapacity);
     }
 
-    let rc = unsafe { spsc_ring_buffer_init(ring as *mut _, slots.as_mut_ptr(), slots.len() as u64) };
+    let rc =
+        unsafe { spsc_ring_buffer_init(ring as *mut _, slots.as_mut_ptr(), slots.len() as u64) };
     if rc != 1 {
         return Err(RingInitError::InitFailed);
     }
@@ -95,11 +97,7 @@ impl Producer<'_> {
     #[inline]
     pub fn try_push(&mut self, update: L2Update) -> Result<(), L2Update> {
         let rc = unsafe { spsc_ring_buffer_push(self.ring.as_ptr(), &update as *const _) };
-        if rc == 1 {
-            Ok(())
-        } else {
-            Err(update)
-        }
+        if rc == 1 { Ok(()) } else { Err(update) }
     }
 
     #[inline]

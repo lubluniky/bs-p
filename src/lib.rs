@@ -1,5 +1,6 @@
 use core::pin::Pin;
 
+pub mod analytics;
 pub mod ring_buffer;
 
 #[repr(C)]
@@ -153,7 +154,11 @@ pub fn calculate_quotes_logit_pinned(
     let ask_ref = ask_p.as_mut().get_mut();
 
     let n = x_ref.len();
-    assert_eq!(q_ref.len(), n, "calculate_quotes_logit: q_t length mismatch");
+    assert_eq!(
+        q_ref.len(),
+        n,
+        "calculate_quotes_logit: q_t length mismatch"
+    );
     assert_eq!(
         sigma_ref.len(),
         n,
@@ -164,7 +169,11 @@ pub fn calculate_quotes_logit_pinned(
         n,
         "calculate_quotes_logit: gamma length mismatch"
     );
-    assert_eq!(tau_ref.len(), n, "calculate_quotes_logit: tau length mismatch");
+    assert_eq!(
+        tau_ref.len(),
+        n,
+        "calculate_quotes_logit: tau length mismatch"
+    );
     assert_eq!(k_ref.len(), n, "calculate_quotes_logit: k length mismatch");
     assert_eq!(
         bid_ref.len(),
