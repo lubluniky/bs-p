@@ -8,7 +8,7 @@ This crate implements the **Logit Jump-Diffusion** approach described in:
 
 - Shaw & Dalen (2025), *Toward Black-Scholes for Prediction Markets: A Unified Kernel and Market-Maker's Handbook*
 
-The goal is practical and HFT-oriented: produce stable, inventory-aware bid/ask quotes in real time across many markets.
+The goal is practical and HFT-oriented: produce stable, inventory-aware bid/ask quotes in real time across many markets while exposing fast decision-support analytics.
 
 ## Why Logit Space
 
@@ -96,6 +96,136 @@ $$
 p^{bid}=S(x^{bid}), \quad p^{ask}=S(x^{ask})
 $$
 
+## Decision Support & Analytics
+
+The analytics layer extends the same model assumptions into calibration, scenario analysis, sizing, microstructure diagnostics, and portfolio risk aggregation.
+
+### 1. Implied Belief Volatility Calibration
+
+Given observed market quotes $(p^{bid}, p^{ask})$, define the observed logit spread:
+
+$$
+\Delta_x^{mkt} = \operatorname{logit}(p^{ask}) - \operatorname{logit}(p^{bid})
+$$
+
+Under the quoting approximation:
+
+$$
+\Delta_x^{model}(\sigma_b) = \gamma\tau\sigma_b^2 + \frac{2}{k}\log\left(1+\frac{\gamma}{k}\right)
+$$
+
+We recover implied $\sigma_b$ by solving:
+
+$$
+f(\sigma_b)=\Delta_x^{model}(\sigma_b)-\Delta_x^{mkt}=0
+$$
+
+using Newton-Raphson in vectorized form:
+
+$$
+\sigma_{n+1}=\max\left(0,\,\sigma_n-\frac{f(\sigma_n)}{f'(\sigma_n)}\right),\quad f'(\sigma)=2\gamma\tau\sigma
+$$
+
+Intuition: this inverts market spread into a latent belief-volatility level used for adaptive risk controls.
+
+### 2. Vectorized Stress-Testing (What-If)
+
+For a shock $\Delta p$, construct shocked probability and logit state:
+
+$$
+p' = \operatorname{clip}(p + \Delta p), \quad x' = \operatorname{logit}(p')
+$$
+
+Then recompute reservation and spread terms:
+
+$$
+r_x' = x' - q_t\gamma\sigma_b^2\tau
+$$
+
+$$
+\delta_x' = \frac{1}{2}\gamma\sigma_b^2\tau + \frac{1}{k}\log\left(1+\frac{\gamma}{k}\right)
+$$
+
+and re-emit shocked quotes, Greeks, and inventory PnL shift:
+
+$$
+\Delta \text{PnL} \approx q_t (p' - p)
+$$
+
+Intuition: this gives an immediate SIMD what-if map of quote drift and risk under probability shocks.
+
+### 3. Adaptive Kelly / Optimal Sizing
+
+Define edge versus market:
+
+$$
+e = p_{user} - p_{mkt}, \quad v = p_{mkt}(1-p_{mkt})
+$$
+
+A Kelly-like sizing signal is:
+
+$$
+f^* = \frac{e}{v}
+$$
+
+The engine scales and clips by risk budget and inventory pressure:
+
+$$
+\text{clip}_{taker} = \operatorname{clamp}\left(f^* \cdot \frac{\text{risk\_limit}}{1+\gamma|q_t|},\,-\text{max\_clip},\,\text{max\_clip}\right)
+$$
+
+with final bounds from hard inventory limits; maker clips are a conservative fraction of taker clips.
+
+Intuition: convert statistical edge into executable size while respecting inventory convexity and risk caps.
+
+### 4. Order Book Microstructure (OBI/VWM Pressure)
+
+Top-of-book imbalance:
+
+$$
+\operatorname{OBI} = \frac{V_b - V_a}{V_b + V_a}
+$$
+
+Volume-weighted mid proxy:
+
+$$
+\operatorname{VWM} = \frac{p^{ask}V_b + p^{bid}V_a}{V_b + V_a}
+$$
+
+Map VWM to logit and build pressure signal:
+
+$$
+\text{pressure} = \operatorname{OBI} + \frac{\operatorname{VWM} - \operatorname{mid}}{\operatorname{spread}}
+$$
+
+Intuition: combine queue imbalance and price skew into a fast directional microstructure factor.
+
+### 5. Cross-Market Portfolio Greeks
+
+Per-market weighted exposures:
+
+$$
+E_i^\Delta = q_i\Delta_i w_i, \quad E_i^\Gamma = q_i\Gamma_i w_i
+$$
+
+Without correlation matrix:
+
+$$
+\Delta_{net}=\sum_i E_i^\Delta, \quad \Gamma_{net}=\sum_i E_i^\Gamma
+$$
+
+With correlation matrix $C$:
+
+$$
+\Delta_{net}=\sum_i E_i^\Delta \sum_j C_{ij}E_j^\Delta
+$$
+
+$$
+\Gamma_{net}=\sum_i E_i^\Gamma \sum_j C_{ij}E_j^\Gamma
+$$
+
+Intuition: aggregate cross-market exposures into a portfolio-level risk state in logit coordinates.
+
 ## HFT Implementation Details
 
 The mathematical model is implemented for throughput-first execution:
@@ -106,7 +236,7 @@ The mathematical model is implemented for throughput-first execution:
 - **Fast sigmoid approximation** in hot path
 - **Zero hot-path allocations** (all buffers supplied by caller)
 
-This design avoids gather penalties from AoS layouts and avoids scalar fallback in the AVX-512 quote path.
+This design avoids gather penalties from AoS layouts and avoids scalar fallback in the AVX-512 quote and analytics paths.
 
 ## Numerical Guard Rails
 
@@ -121,6 +251,6 @@ For robust production behavior:
 - Inventory risk term widens/skews quotes as position grows.
 - Volatility and time-to-resolution increase risk compensation.
 - Arrival-rate parameter $k$ controls how much non-linearity is needed in spread.
-- Combined, the kernel balances fill probability vs adverse selection.
+- Analytics layer closes the loop from market observables to actionable sizing and portfolio controls.
 
-In short: this is a production-grade, SIMD-native kernel for quoting prediction markets with mathematically coherent risk control.
+In short: this is a production-grade, SIMD-native quoting, decision-support, and risk engine for prediction markets.

@@ -8,7 +8,7 @@
 
 - Shaw & Dalen (2025), *Toward Black-Scholes for Prediction Markets: A Unified Kernel and Market-Maker's Handbook*
 
-Цель прикладная и HFT-ориентированная: стабильно и быстро строить inventory-aware bid/ask-котировки в реальном времени по большому числу рынков.
+Цель прикладная и HFT-ориентированная: стабильно и быстро строить inventory-aware bid/ask-котировки в реальном времени по большому числу рынков и давать низколатентную аналитику для принятия решений.
 
 ## Почему logit-пространство
 
@@ -59,7 +59,7 @@ $$
 - $q_t$: текущий инвентарь
 - $\sigma_b$: волатильность belief
 - $\gamma$: риск-аверсия
-- $\tau = T-t$: время до экспирации/резолва
+- $\tau = T-t$: время до резолва
 - $k$: параметр прихода ордеров/ликвидности
 
 ### Reservation Quote
@@ -96,6 +96,136 @@ $$
 p^{bid}=S(x^{bid}), \quad p^{ask}=S(x^{ask})
 $$
 
+## Decision Support & Analytics
+
+Аналитический слой расширяет те же модельные предположения на калибровку, сценарный анализ, sizing, диагностику микроструктуры и портфельную агрегацию рисков.
+
+### 1. Калибровка Implied Belief Volatility
+
+Из наблюдаемых рыночных котировок $(p^{bid}, p^{ask})$ считаем logit-спред:
+
+$$
+\Delta_x^{mkt} = \operatorname{logit}(p^{ask}) - \operatorname{logit}(p^{bid})
+$$
+
+В модели котирования:
+
+$$
+\Delta_x^{model}(\sigma_b) = \gamma\tau\sigma_b^2 + \frac{2}{k}\log\left(1+\frac{\gamma}{k}\right)
+$$
+
+Восстанавливаем implied $\sigma_b$ из уравнения:
+
+$$
+f(\sigma_b)=\Delta_x^{model}(\sigma_b)-\Delta_x^{mkt}=0
+$$
+
+методом Newton-Raphson в векторизованном виде:
+
+$$
+\sigma_{n+1}=\max\left(0,\,\sigma_n-\frac{f(\sigma_n)}{f'(\sigma_n)}\right),\quad f'(\sigma)=2\gamma\tau\sigma
+$$
+
+Интуиция: инвертируем наблюдаемый спред рынка в латентный уровень belief-волатильности для адаптивного risk control.
+
+### 2. Vectorized Stress-Testing (What-If)
+
+Для шока $\Delta p$ строим шокированную вероятность и logit-состояние:
+
+$$
+p' = \operatorname{clip}(p + \Delta p), \quad x' = \operatorname{logit}(p')
+$$
+
+Далее пересчитываем reservation и спред:
+
+$$
+r_x' = x' - q_t\gamma\sigma_b^2\tau
+$$
+
+$$
+\delta_x' = \frac{1}{2}\gamma\sigma_b^2\tau + \frac{1}{k}\log\left(1+\frac{\gamma}{k}\right)
+$$
+
+и получаем новые котировки, греки и инвентарный PnL shift:
+
+$$
+\Delta \text{PnL} \approx q_t (p' - p)
+$$
+
+Интуиция: SIMD what-if карта мгновенно показывает дрейф котировок и риска под вероятностными шоками.
+
+### 3. Adaptive Kelly / Optimal Sizing
+
+Определяем edge относительно рынка:
+
+$$
+e = p_{user} - p_{mkt}, \quad v = p_{mkt}(1-p_{mkt})
+$$
+
+Kelly-подобный sizing-сигнал:
+
+$$
+f^* = \frac{e}{v}
+$$
+
+Далее масштабирование и ограничение по риск-бюджету и инвентарю:
+
+$$
+\text{clip}_{taker} = \operatorname{clamp}\left(f^* \cdot \frac{\text{risk\_limit}}{1+\gamma|q_t|},\,-\text{max\_clip},\,\text{max\_clip}\right)
+$$
+
+с финальными hard-bound по inventory limits; maker clips берутся как более консервативная доля taker clips.
+
+Интуиция: перевод статистического edge в исполнимый размер позиции с учётом инвентарной выпуклости и риск-лимитов.
+
+### 4. Микроструктура стакана (OBI/VWM Pressure)
+
+Дисбаланс top-of-book:
+
+$$
+\operatorname{OBI} = \frac{V_b - V_a}{V_b + V_a}
+$$
+
+Volume-weighted mid proxy:
+
+$$
+\operatorname{VWM} = \frac{p^{ask}V_b + p^{bid}V_a}{V_b + V_a}
+$$
+
+Переход к logit и сигнал давления:
+
+$$
+\text{pressure} = \operatorname{OBI} + \frac{\operatorname{VWM} - \operatorname{mid}}{\operatorname{spread}}
+$$
+
+Интуиция: объединяем очередной дисбаланс и ценовой skew в быстрый направленный фактор микроструктуры.
+
+### 5. Cross-Market Portfolio Greeks
+
+Взвешенные экспозиции по рынкам:
+
+$$
+E_i^\Delta = q_i\Delta_i w_i, \quad E_i^\Gamma = q_i\Gamma_i w_i
+$$
+
+Без матрицы корреляций:
+
+$$
+\Delta_{net}=\sum_i E_i^\Delta, \quad \Gamma_{net}=\sum_i E_i^\Gamma
+$$
+
+С матрицей корреляций $C$:
+
+$$
+\Delta_{net}=\sum_i E_i^\Delta \sum_j C_{ij}E_j^\Delta
+$$
+
+$$
+\Gamma_{net}=\sum_i E_i^\Gamma \sum_j C_{ij}E_j^\Gamma
+$$
+
+Интуиция: сжимаем кросс-рыночные экспозиции в портфельное risk-state в logit-координатах.
+
 ## HFT-детали реализации
 
 Математическая модель реализована с приоритетом на throughput:
@@ -106,7 +236,7 @@ $$
 - **Быстрая аппроксимация sigmoid** в hot path
 - **Ноль аллокаций в hot path** (все буферы передаются вызывающей стороной)
 
-Такой дизайн убирает штрафы `gather` из AoS-layout и не допускает scalar fallback в AVX-512 пути квотирования.
+Такой дизайн убирает штрафы `gather` из AoS-layout и не допускает scalar fallback в AVX-512 путях квотинга и аналитики.
 
 ## Численные guard rails
 
@@ -120,7 +250,7 @@ $$
 
 - Термин инвентарного риска расширяет/смещает котировки при росте позиции.
 - Волатильность и время до резолва увеличивают risk compensation.
-- Параметр прихода ордеров $k$ определяет нелинейную часть спреда.
-- В сумме ядро балансирует вероятность исполнения и adverse selection.
+- Параметр прихода ордеров $k$ задаёт нелинейную часть спреда.
+- Аналитический слой замыкает контур от наблюдений рынка к исполнимым sizing и портфельному риск-контролю.
 
-Итог: это production-grade, SIMD-native ядро для котирования prediction markets с математически консистентным risk control.
+Итог: это production-grade, SIMD-native движок котирования, decision-support и управления риском для prediction markets.
