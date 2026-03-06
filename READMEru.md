@@ -16,6 +16,8 @@
 - inventory-aware execution math
 - векторизованную аналитику и портфельную агрегацию рисков
 
+Во время выполнения всегда доступен portable baseline path для любого x86_64 CPU, а AVX-512 включается только если хост действительно поддерживает эту инструкцию.
+
 Источник:
 - [Toward Black-Scholes for Prediction Markets (Shaw & Dalen, 2025)](https://arxiv.org/pdf/2510.15205)
 
@@ -23,10 +25,9 @@
 
 ### Core Quoting Kernel
 - SoA (Structure of Arrays) layout для contiguous memory access и SIMD-friendly загрузок
-- AVX-512 векторизация движка котирования для batch-обработки рынков
+- Runtime-dispatched AVX-512 ускорение котирования с portable fallback
 - Inventory-aware котирование по Avellaneda-Stoikov в logit-пространстве
-- Кастомная AVX-512 аппроксимация `log1p` без scalar fallback при вычислении спреда
-- Быстрая аппроксимация sigmoid для `x -> p` в hot path
+- Точная и численно устойчивая связка `sigmoid`/`logit` во всём публичном API
 
 ### Analytics Capabilities
 - Калибровка Implied Belief Volatility из рыночных bid/ask котировок
@@ -37,8 +38,10 @@
 
 ### Systems Properties
 - C-ядро в `c_src/*` и FFI-safe Rust bindings в `src/*`
+- Portable baseline, который запускается на любом x86_64 CPU
 - Ноль аллокаций в hot path (буферы задаются вызывающей стороной)
-- Численно безопасные ограничения (`clamp`) для стабильных `logit`/`sigmoid`
+- Runtime-dispatched AVX-512 fast path на поддерживаемых серверных CPU
+- Численно безопасный clamp для стабильного `logit` без saturation больших logits
 - Lock-free SPSC ring buffer для передачи рыночных апдейтов
 
 ## Quick Start
@@ -108,6 +111,8 @@ fn main() {
         &mut implied_sigma,
     );
 
+    // `q_t` сохранён для единообразия API, хотя текущая формула калибровки
+    // зависит только от spread, gamma, tau и k.
     let x_t = vec![0.20, -0.40, 0.70, -1.10];
     let shock_p = vec![0.01, -0.02, 0.03, -0.01];
 
@@ -145,7 +150,7 @@ fn main() {
 ============================================================
  Quote Batch Size        :       8192 markets
  Quote Iterations        :     100000
- AVX-512 Quote Latency   :       6.71 ns/market
+ Runtime-Dispatch Quote :       6.71 ns/market
 ------------------------------------------------------------
  SPSC Ring Capacity      :    1048576
  SPSC Messages           :   10000000

@@ -206,9 +206,162 @@ mod tests {
     use super::*;
     use core::mem::{align_of, size_of};
 
+    unsafe extern "C" {
+        #[link_name = "pm_internal_calculate_quotes_logit_portable"]
+        fn ffi_internal_calculate_quotes_logit_portable(
+            x_t: *const f64,
+            q_t: *const f64,
+            sigma_b: *const f64,
+            gamma: *const f64,
+            tau: *const f64,
+            k: *const f64,
+            bid_p: *mut f64,
+            ask_p: *mut f64,
+            n: usize,
+        );
+    }
+
+    fn assert_close(actual: f64, expected: f64, tol: f64) {
+        let diff = (actual - expected).abs();
+        assert!(
+            diff <= tol,
+            "expected {expected:.15}, got {actual:.15}, diff {diff:.15} > {tol:.15}"
+        );
+    }
+
+    fn has_avx512f() -> bool {
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        {
+            std::arch::is_x86_feature_detected!("avx512f")
+        }
+
+        #[cfg(not(any(target_arch = "x86", target_arch = "x86_64")))]
+        {
+            false
+        }
+    }
+
+    fn run_quote_portable(
+        x_t: &[f64],
+        q_t: &[f64],
+        sigma_b: &[f64],
+        gamma: &[f64],
+        tau: &[f64],
+        k: &[f64],
+    ) -> (Vec<f64>, Vec<f64>) {
+        let n = x_t.len();
+        let mut bid_p = vec![0.0; n];
+        let mut ask_p = vec![0.0; n];
+
+        unsafe {
+            ffi_internal_calculate_quotes_logit_portable(
+                x_t.as_ptr(),
+                q_t.as_ptr(),
+                sigma_b.as_ptr(),
+                gamma.as_ptr(),
+                tau.as_ptr(),
+                k.as_ptr(),
+                bid_p.as_mut_ptr(),
+                ask_p.as_mut_ptr(),
+                n,
+            );
+        }
+
+        (bid_p, ask_p)
+    }
+
     #[test]
     fn greek_layout_is_compact() {
         assert_eq!(size_of::<GreekOut>(), 16);
         assert_eq!(align_of::<GreekOut>(), 8);
+    }
+
+    #[test]
+    fn logit_sigmoid_roundtrip_is_stable() {
+        for x in [-20.0, -10.0, -2.0, 0.0, 2.0, 10.0, 20.0] {
+            let p = sigmoid(x);
+            let roundtrip = logit(p);
+            assert_close(roundtrip, x, 1e-7);
+        }
+    }
+
+    #[test]
+    fn sigmoid_batch_matches_scalar() {
+        let x = [-20.0, -3.0, -0.5, 0.0, 0.5, 4.0, 12.0, 20.0, -15.0];
+        let mut out = vec![0.0; x.len()];
+        sigmoid_batch(&x, &mut out);
+
+        for (actual, input) in out.iter().zip(x) {
+            assert_close(*actual, sigmoid(input), 1e-15);
+        }
+    }
+
+    #[test]
+    fn greeks_batch_matches_scalar_reference() {
+        let x = [-12.0, -1.5, 0.0, 1.5, 12.0, 20.0, -20.0];
+        let mut out = vec![GreekOut::default(); x.len()];
+        greeks_batch(&x, &mut out);
+
+        for (actual, input) in out.iter().zip(x) {
+            let expected = greeks_from_logit(input);
+            assert_close(actual.delta_x, expected.delta_x, 1e-15);
+            assert_close(actual.gamma_x, expected.gamma_x, 1e-15);
+        }
+    }
+
+    #[test]
+    fn calculate_quotes_dispatch_matches_portable_reference() {
+        if !has_avx512f() {
+            return;
+        }
+
+        for len in [3usize, 8, 17] {
+            let x_t: Vec<_> = (0..len)
+                .map(|i| -2.5 + (i as f64) * 0.4 + if i % 4 == 0 { 6.0 } else { 0.0 })
+                .collect();
+            let q_t: Vec<_> = (0..len).map(|i| (i as f64) - 3.0).collect();
+            let sigma_b: Vec<_> = (0..len).map(|i| 0.1 + (i as f64) * 0.02).collect();
+            let gamma: Vec<_> = (0..len)
+                .map(|i| {
+                    if i % 5 == 0 {
+                        -0.05
+                    } else {
+                        0.03 + (i as f64) * 0.01
+                    }
+                })
+                .collect();
+            let tau: Vec<_> = (0..len)
+                .map(|i| {
+                    if i % 6 == 0 {
+                        -0.1
+                    } else {
+                        0.2 + (i as f64) * 0.03
+                    }
+                })
+                .collect();
+            let k: Vec<_> = (0..len)
+                .map(|i| {
+                    if i % 7 == 0 {
+                        0.0
+                    } else {
+                        1.0 + (i as f64) * 0.1
+                    }
+                })
+                .collect();
+
+            let mut bid_p = vec![0.0; len];
+            let mut ask_p = vec![0.0; len];
+            calculate_quotes_logit(
+                &x_t, &q_t, &sigma_b, &gamma, &tau, &k, &mut bid_p, &mut ask_p,
+            );
+
+            let (expected_bid, expected_ask) =
+                run_quote_portable(&x_t, &q_t, &sigma_b, &gamma, &tau, &k);
+
+            for i in 0..len {
+                assert_close(bid_p[i], expected_bid[i], 1e-12);
+                assert_close(ask_p[i], expected_ask[i], 1e-12);
+            }
+        }
     }
 }

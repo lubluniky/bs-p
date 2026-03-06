@@ -13,6 +13,5 @@ fn main() {
         .file("c_src/analytics.c")
         .flag_if_supported("-std=c23")
         .flag_if_supported("-O3")
-        .flag_if_supported("-mavx512f")
         .compile("polymarket_kernel_c");
 }

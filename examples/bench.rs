@@ -131,7 +131,7 @@ fn main() {
 
     let ns_per_market = bench_quote_latency();
     println!(
-        " AVX-512 Quote Latency   : {:>10.2} ns/market",
+        " Runtime-Dispatch Quote : {:>10.2} ns/market",
         ns_per_market
     );
 

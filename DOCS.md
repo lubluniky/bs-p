@@ -128,6 +128,8 @@ $$
 
 Intuition: this inverts market spread into a latent belief-volatility level used for adaptive risk controls.
 
+`q_t` is kept in the API for consistency with the other batch analytics calls, but it is not part of the current calibration formula.
+
 ### 2. Vectorized Stress-Testing (What-If)
 
 For a shock $\Delta p$, construct shocked probability and logit state:
@@ -231,19 +233,19 @@ Intuition: aggregate cross-market exposures into a portfolio-level risk state in
 The mathematical model is implemented for throughput-first execution:
 
 - **SoA layout** (`x_t[]`, `q_t[]`, `sigma_b[]`, `gamma[]`, `tau[]`, `k[]`) for contiguous memory streams
-- **AVX-512 SIMD** batch evaluation over 8 `f64` lanes per vector
-- **Custom AVX-512 `log1p` approximation** to keep spread computation fully vectorized
-- **Fast sigmoid approximation** in hot path
+- **Portable baseline path** so the crate runs on any x86_64 CPU
+- **Runtime-dispatched AVX-512 SIMD** batch evaluation over 8 `f64` lanes per vector on supported hosts
+- **Exact sigmoid/logit contract** in the public API, with numerically aligned portable and AVX-512 paths
 - **Zero hot-path allocations** (all buffers supplied by caller)
 
-This design avoids gather penalties from AoS layouts and avoids scalar fallback in the AVX-512 quote and analytics paths.
+This design avoids gather penalties from AoS layouts while keeping portable and AVX-512 paths numerically aligned.
 
 ## Numerical Guard Rails
 
 For robust production behavior:
 
 - Inputs are clamped where needed (`k >= \epsilon`, `gamma >= 0`, `tau >= 0`)
-- Probability outputs are clamped to $(\epsilon, 1-\epsilon)$ to keep `logit` finite
+- Probability inputs to `logit` are clamped to $(\epsilon, 1-\epsilon)$ to keep `logit` finite
 - Branch-minimized math helps preserve predictable latency under load
 
 ## Practical Intuition

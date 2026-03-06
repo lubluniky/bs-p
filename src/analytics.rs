@@ -79,6 +79,9 @@ fn assert_len(label: &str, actual: usize, expected: usize) {
 }
 
 #[allow(clippy::too_many_arguments)]
+/// `q_t` is retained in the API for model-shape consistency with the rest of the
+/// analytics surface, but the current calibration formula depends only on the
+/// observed spread, `gamma`, `tau`, and `k`.
 pub fn implied_belief_volatility_batch(
     bid_p: &[f64],
     ask_p: &[f64],
@@ -302,4 +305,163 @@ pub fn aggregate_portfolio_greeks(
     }
 
     (net_delta, net_gamma)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    unsafe extern "C" {
+        #[link_name = "pm_internal_order_book_microstructure_batch_portable"]
+        fn ffi_internal_order_book_microstructure_batch_portable(
+            bid_p: *const f64,
+            ask_p: *const f64,
+            bid_vol: *const f64,
+            ask_vol: *const f64,
+            out_obi: *mut f64,
+            out_vwm_p: *mut f64,
+            out_vwm_x: *mut f64,
+            out_pressure: *mut f64,
+            n: usize,
+        );
+    }
+
+    fn assert_close(actual: f64, expected: f64, tol: f64) {
+        let diff = (actual - expected).abs();
+        assert!(
+            diff <= tol,
+            "expected {expected:.15}, got {actual:.15}, diff {diff:.15} > {tol:.15}"
+        );
+    }
+
+    fn has_avx512f() -> bool {
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        {
+            std::arch::is_x86_feature_detected!("avx512f")
+        }
+
+        #[cfg(not(any(target_arch = "x86", target_arch = "x86_64")))]
+        {
+            false
+        }
+    }
+
+    fn run_order_book_portable(
+        bid_p: &[f64],
+        ask_p: &[f64],
+        bid_vol: &[f64],
+        ask_vol: &[f64],
+    ) -> (Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>) {
+        let n = bid_p.len();
+        let mut obi = vec![0.0; n];
+        let mut vwm_p = vec![0.0; n];
+        let mut vwm_x = vec![0.0; n];
+        let mut pressure = vec![0.0; n];
+
+        unsafe {
+            ffi_internal_order_book_microstructure_batch_portable(
+                bid_p.as_ptr(),
+                ask_p.as_ptr(),
+                bid_vol.as_ptr(),
+                ask_vol.as_ptr(),
+                obi.as_mut_ptr(),
+                vwm_p.as_mut_ptr(),
+                vwm_x.as_mut_ptr(),
+                pressure.as_mut_ptr(),
+                n,
+            );
+        }
+
+        (obi, vwm_p, vwm_x, pressure)
+    }
+
+    #[test]
+    fn order_book_microstructure_clamps_invalid_inputs() {
+        let bid_p = [0.0, 0.8, -0.2];
+        let ask_p = [1.2, 0.7, 0.4];
+        let bid_vol = [-5.0, 0.0, 3.0];
+        let ask_vol = [0.0, -2.0, 0.0];
+
+        let mut obi = vec![0.0; bid_p.len()];
+        let mut vwm_p = vec![0.0; bid_p.len()];
+        let mut vwm_x = vec![0.0; bid_p.len()];
+        let mut pressure = vec![0.0; bid_p.len()];
+
+        order_book_microstructure_batch(
+            &bid_p,
+            &ask_p,
+            &bid_vol,
+            &ask_vol,
+            &mut obi,
+            &mut vwm_p,
+            &mut vwm_x,
+            &mut pressure,
+        );
+
+        let (expected_obi, expected_vwm_p, expected_vwm_x, expected_pressure) =
+            run_order_book_portable(&bid_p, &ask_p, &bid_vol, &ask_vol);
+
+        for i in 0..bid_p.len() {
+            assert!(obi[i].is_finite());
+            assert!(vwm_p[i].is_finite());
+            assert!(vwm_x[i].is_finite());
+            assert!(pressure[i].is_finite());
+            assert_close(obi[i], expected_obi[i], 1e-12);
+            assert_close(vwm_p[i], expected_vwm_p[i], 1e-12);
+            assert_close(vwm_x[i], expected_vwm_x[i], 1e-12);
+            assert_close(pressure[i], expected_pressure[i], 1e-12);
+        }
+    }
+
+    #[test]
+    fn order_book_dispatch_matches_portable_reference() {
+        if !has_avx512f() {
+            return;
+        }
+
+        for len in [3usize, 8, 17] {
+            let bid_p: Vec<_> = (0..len).map(|i| 0.15 + (i as f64) * 0.03).collect();
+            let ask_p: Vec<_> = (0..len)
+                .map(|i| 0.20 + (i as f64) * 0.03 - if i % 5 == 0 { 0.07 } else { 0.0 })
+                .collect();
+            let bid_vol: Vec<_> = (0..len)
+                .map(|i| if i % 4 == 0 { -2.0 } else { 1.0 + i as f64 })
+                .collect();
+            let ask_vol: Vec<_> = (0..len)
+                .map(|i| {
+                    if i % 6 == 0 {
+                        -1.0
+                    } else {
+                        0.5 + (i as f64) * 0.5
+                    }
+                })
+                .collect();
+
+            let mut obi = vec![0.0; len];
+            let mut vwm_p = vec![0.0; len];
+            let mut vwm_x = vec![0.0; len];
+            let mut pressure = vec![0.0; len];
+
+            order_book_microstructure_batch(
+                &bid_p,
+                &ask_p,
+                &bid_vol,
+                &ask_vol,
+                &mut obi,
+                &mut vwm_p,
+                &mut vwm_x,
+                &mut pressure,
+            );
+
+            let (expected_obi, expected_vwm_p, expected_vwm_x, expected_pressure) =
+                run_order_book_portable(&bid_p, &ask_p, &bid_vol, &ask_vol);
+
+            for i in 0..len {
+                assert_close(obi[i], expected_obi[i], 1e-12);
+                assert_close(vwm_p[i], expected_vwm_p[i], 1e-12);
+                assert_close(vwm_x[i], expected_vwm_x[i], 1e-12);
+                assert_close(pressure[i], expected_pressure[i], 1e-12);
+            }
+        }
+    }
 }
