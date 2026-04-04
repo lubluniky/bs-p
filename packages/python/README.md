@@ -1,4 +1,4 @@
-# bs-p
+# bs-poly
 
 Python bindings for the `bs-p` C kernel.
 

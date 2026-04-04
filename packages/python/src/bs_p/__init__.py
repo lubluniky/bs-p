@@ -9,7 +9,7 @@ __version__ = "0.2.2"
 
 def healthcheck() -> dict[str, str]:
     return {
-        "package": "bs-p",
+        "package": "bs-poly",
         "version": __version__,
         "status": "ok",
     }
