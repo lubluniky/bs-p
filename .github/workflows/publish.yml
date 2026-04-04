@@ -48,7 +48,7 @@ jobs:
         run: |
           CRATE_NAME="$(sed -n 's/^name = "\(.*\)"/\1/p' packages/crates/Cargo.toml | head -n 1)"
           CRATE_VERSION="$(sed -n 's/^version = "\(.*\)"/\1/p' packages/crates/Cargo.toml | head -n 1)"
-          if curl -fsS "https://crates.io/api/v1/crates/${CRATE_NAME}/${CRATE_VERSION}" >/dev/null; then
+          if curl -fsS "https://crates.io/api/v1/crates/${CRATE_NAME}" | grep -Fq "\"num\":\"${CRATE_VERSION}\""; then
             echo "Crate ${CRATE_NAME}@${CRATE_VERSION} already published, skipping."
             exit 0
           fi
