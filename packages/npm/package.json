@@ -1,0 +1,22 @@
+{
+  "name": "holypolyfoundation-bs-p-npm",
+  "version": "0.2.2",
+  "description": "Node.js companion package for bs-p releases.",
+  "license": "MIT",
+  "type": "module",
+  "main": "index.js",
+  "files": [
+    "index.js",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "node -e \"console.log('npm package build ok')\"",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

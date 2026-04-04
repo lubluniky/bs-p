@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bs-p"
+version = "0.2.2"
+description = "Python companion package for bs-p releases."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [
+  { name = "Holypoly Foundation" }
+]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Operating System :: OS Independent"
+]
+
+[project.urls]
+Homepage = "https://github.com/holypolyfoundation/bs-p"
+Repository = "https://github.com/holypolyfoundation/bs-p"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]

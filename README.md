@@ -7,6 +7,15 @@
 
 Ultra-low latency computational core for Polymarket market making, now upgraded into a comprehensive decision-support and risk engine for prediction-market microstructure.
 
+## Repository Layout
+
+- `packages/crates`: Rust crate (`polymarket-kernel`)
+- `packages/npm`: public npm package
+- `packages/bun`: public Bun package
+- `packages/python`: public PyPI package
+- `docs`: additional project documentation
+- `tools`: local release and utility scripts
+
 ## Overview
 
 `polymarket-kernel` implements a unified logit-space stochastic framework where probabilities are transformed into log-odds and processed through SIMD-native math.
@@ -37,7 +46,7 @@ Source paper:
 - Cross-Market Portfolio Greeks aggregation with optional weighting and correlation matrix support
 
 ### Systems Properties
-- C kernel in `c_src/*` with FFI-safe Rust bindings in `src/*`
+- C kernel in `packages/crates/c_src/*` with FFI-safe Rust bindings in `packages/crates/src/*`
 - Portable baseline that runs on any x86_64 CPU
 - Zero allocations in the hot path (pre-allocated caller-managed buffers)
 - Runtime-dispatched AVX-512 fast path on supported server-class CPUs

@@ -2,9 +2,13 @@
 /target/
 Cargo.lock
 
-# Local validation scripts (do not track)
-*.py
-scripts/
+# Local artifacts
+.DS_Store
+node_modules/
+dist/
+*.egg-info/
+*.tgz
+build/
 venv/
 .env
 __pycache__/

@@ -1,0 +1,20 @@
+{
+  "name": "holypolyfoundation-bs-p-bun",
+  "version": "0.2.2",
+  "description": "Bun companion package for bs-p releases.",
+  "license": "MIT",
+  "type": "module",
+  "module": "index.js",
+  "main": "index.js",
+  "files": [
+    "index.js",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "bun -e \"console.log('bun package build ok')\"",
+    "test": "bun test"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

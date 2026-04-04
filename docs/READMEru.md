@@ -37,7 +37,7 @@
 - Cross-Market Portfolio Greeks агрегация с опциональными весами и матрицей корреляций
 
 ### Systems Properties
-- C-ядро в `c_src/*` и FFI-safe Rust bindings в `src/*`
+- C-ядро в `packages/crates/c_src/*` и FFI-safe Rust bindings в `packages/crates/src/*`
 - Portable baseline, который запускается на любом x86_64 CPU
 - Ноль аллокаций в hot path (буферы задаются вызывающей стороной)
 - Runtime-dispatched AVX-512 fast path на поддерживаемых серверных CPU
