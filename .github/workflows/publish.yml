@@ -46,13 +46,23 @@ jobs:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         shell: bash
         run: |
-          CRATE_NAME="$(sed -n 's/^name = "\(.*\)"/\1/p' packages/crates/Cargo.toml | head -n 1)"
-          CRATE_VERSION="$(sed -n 's/^version = "\(.*\)"/\1/p' packages/crates/Cargo.toml | head -n 1)"
-          if curl -fsS "https://crates.io/api/v1/crates/${CRATE_NAME}" | grep -Fq "\"num\":\"${CRATE_VERSION}\""; then
-            echo "Crate ${CRATE_NAME}@${CRATE_VERSION} already published, skipping."
+          set +e
+          PUBLISH_OUTPUT="$(cargo publish --manifest-path packages/crates/Cargo.toml 2>&1)"
+          PUBLISH_EXIT=$?
+          set -e
+
+          echo "${PUBLISH_OUTPUT}"
+
+          if [[ ${PUBLISH_EXIT} -eq 0 ]]; then
             exit 0
           fi
-          cargo publish --manifest-path packages/crates/Cargo.toml
+
+          if echo "${PUBLISH_OUTPUT}" | grep -Fq "already exists on crates.io index"; then
+            echo "Crate version already published, skipping."
+            exit 0
+          fi
+
+          exit ${PUBLISH_EXIT}
 
   publish-npm:
     needs: detect
