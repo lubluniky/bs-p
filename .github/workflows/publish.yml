@@ -27,6 +27,7 @@ jobs:
     needs: detect
     if: needs.detect.outputs.has_rust == 'true'
     runs-on: ubuntu-latest
+    environment: build
     permissions:
       contents: read
     steps:
@@ -49,6 +50,7 @@ jobs:
     needs: detect
     if: needs.detect.outputs.has_npm == 'true'
     runs-on: ubuntu-latest
+    environment: build
     permissions:
       contents: read
       id-token: write
@@ -82,6 +84,7 @@ jobs:
     needs: detect
     if: needs.detect.outputs.has_bun == 'true'
     runs-on: ubuntu-latest
+    environment: build
     permissions:
       contents: read
       id-token: write
@@ -115,6 +118,7 @@ jobs:
     needs: detect
     if: needs.detect.outputs.has_python == 'true'
     runs-on: ubuntu-latest
+    environment: build
     permissions:
       contents: read
       id-token: write
