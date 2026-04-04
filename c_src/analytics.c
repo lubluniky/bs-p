@@ -6,7 +6,7 @@
 
 #if (defined(__x86_64__) || defined(__i386__)) && (defined(__GNUC__) || defined(__clang__))
 #define PM_ANALYTICS_HAS_AVX512_DISPATCH 1
-#define PM_ANALYTICS_TARGET_AVX512 __attribute__((target("avx512f")))
+#define PM_ANALYTICS_TARGET_AVX512 __attribute__((target("avx512f,avx512dq")))
 #include <immintrin.h>
 #else
 #define PM_ANALYTICS_HAS_AVX512_DISPATCH 0
@@ -40,7 +40,7 @@ static inline int analytics_runtime_has_avx512f(void) {
 
 #if PM_ANALYTICS_HAS_AVX512_DISPATCH
     __builtin_cpu_init();
-    has_avx512f = __builtin_cpu_supports("avx512f") ? 1 : 0;
+    has_avx512f = (__builtin_cpu_supports("avx512f") && __builtin_cpu_supports("avx512dq")) ? 1 : 0;
 #endif
 
     atomic_store_explicit(&analytics_has_avx512f_cache, has_avx512f, memory_order_relaxed);
