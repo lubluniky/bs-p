@@ -255,4 +255,4 @@ fn main() {
 
 ## License
 
-MIT
+[`MIT`](https://github.com/holypolyfoundation/bs-p/blob/main/LICENSE)
