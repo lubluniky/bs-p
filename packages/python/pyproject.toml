@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "bs-p"
 version = "0.2.2"
-description = "Python companion package for bs-p releases."
+description = "Python bindings for the bs-p C kernel."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"

@@ -1,6 +1,8 @@
-"""Python companion package for bs-p releases."""
+"""Python bindings for the bs-p C kernel."""
 
-__all__ = ["healthcheck", "__version__"]
+from ._core import calculate_quotes_logit, logit, sigmoid
+
+__all__ = ["calculate_quotes_logit", "sigmoid", "logit", "healthcheck", "__version__"]
 
 __version__ = "0.2.2"
 

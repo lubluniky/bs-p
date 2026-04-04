@@ -69,6 +69,9 @@ jobs:
         working-directory: packages/bun
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
       - uses: oven-sh/setup-bun@v2
       - name: Install dependencies
         shell: bash
@@ -99,3 +102,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip build
           python -m build
+      - name: Verify Python bindings import
+        run: |
+          python -m pip install --force-reinstall dist/*.whl
+          python -c "import bs_p; r=bs_p.calculate_quotes_logit([0.1],[0.0],[0.2],[0.08],[0.5],[1.2]); assert 'bid_p' in r and 'ask_p' in r"

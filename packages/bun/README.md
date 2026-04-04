@@ -1,3 +1,9 @@
 # holypolyfoundation-bs-p-bun
 
-Public Bun package for the `bs-p` repository.
+Bun bindings for the `bs-p` C kernel.
+
+## API
+
+- `sigmoid(x: number): number`
+- `logit(p: number): number`
+- `calculateQuotesLogit(x_t, q_t, sigma_b, gamma, tau, k): { bid_p: Float64Array, ask_p: Float64Array }`

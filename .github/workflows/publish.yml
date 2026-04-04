@@ -90,6 +90,9 @@ jobs:
         working-directory: packages/bun
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
       - uses: oven-sh/setup-bun@v2
       - name: Validate npm token for Bun publish
         env:
