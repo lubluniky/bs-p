@@ -44,6 +44,27 @@ pip install bs-poly
 
 ## Usage Guide
 
+### Rust
+
+```rust
+use polymarket_kernel::calculate_quotes_logit;
+
+fn main() {
+    let x_t = vec![0.1];
+    let q_t = vec![0.0];
+    let sigma_b = vec![0.2];
+    let gamma = vec![0.08];
+    let tau = vec![0.5];
+    let k = vec![1.2];
+
+    let mut bid_p = vec![0.0; 1];
+    let mut ask_p = vec![0.0; 1];
+
+    calculate_quotes_logit(&x_t, &q_t, &sigma_b, &gamma, &tau, &k, &mut bid_p, &mut ask_p);
+    println!("bid={:.6}, ask={:.6}", bid_p[0], ask_p[0]);
+}
+```
+
 ### Node.js / npm
 
 ```js
