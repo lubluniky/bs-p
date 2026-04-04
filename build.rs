@@ -11,7 +11,7 @@ fn main() {
         .file("c_src/kernel.c")
         .file("c_src/ring_buffer.c")
         .file("c_src/analytics.c")
-        .flag_if_supported("-std=c23")
+        .flag_if_supported("-std=c11")
         .flag_if_supported("-O3")
         .compile("polymarket_kernel_c");
 }

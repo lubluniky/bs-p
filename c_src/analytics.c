@@ -48,6 +48,7 @@ static inline int analytics_runtime_has_avx512f(void) {
 }
 
 #if PM_ANALYTICS_HAS_AVX512_DISPATCH
+PM_ANALYTICS_TARGET_AVX512
 static inline double analytics_reduce_add_pd(__m512d x) {
     double tmp[8];
     _mm512_storeu_pd(tmp, x);
