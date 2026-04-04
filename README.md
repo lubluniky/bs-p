@@ -16,6 +16,71 @@ Ultra-low latency computational core for Polymarket market making, now upgraded 
 - `docs`: additional project documentation
 - `tools`: local release and utility scripts
 
+## Published Packages
+
+- crates.io: [`polymarket-kernel`](https://crates.io/crates/polymarket-kernel)
+- npm: [`holypolyfoundation-bs-p-npm`](https://www.npmjs.com/package/holypolyfoundation-bs-p-npm)
+- Bun (npm registry): [`holypolyfoundation-bs-p-bun`](https://www.npmjs.com/package/holypolyfoundation-bs-p-bun)
+- PyPI: [`bs-poly`](https://pypi.org/project/bs-poly/)
+
+## Install
+
+```bash
+# Rust
+cargo add polymarket-kernel
+
+# Node.js / npm
+npm i holypolyfoundation-bs-p-npm
+
+# Bun
+bun add holypolyfoundation-bs-p-bun
+# for native build in Bun, trust install scripts for this package:
+# add "trustedDependencies": ["holypolyfoundation-bs-p-bun"] to package.json
+# then run bun install
+
+# Python
+pip install bs-poly
+```
+
+## Usage Guide
+
+### Node.js / npm
+
+```js
+import { sigmoid, logit, calculateQuotesLogit } from "holypolyfoundation-bs-p-npm";
+
+console.log(sigmoid(0)); // 0.5
+console.log(logit(0.5)); // 0
+
+const out = calculateQuotesLogit([0.1], [0.0], [0.2], [0.08], [0.5], [1.2]);
+console.log(out.bid_p, out.ask_p);
+```
+
+### Bun
+
+```js
+import { sigmoid, logit, calculateQuotesLogit } from "holypolyfoundation-bs-p-bun";
+
+console.log(sigmoid(0)); // 0.5
+console.log(logit(0.5)); // 0
+
+const out = calculateQuotesLogit([0.1], [0.0], [0.2], [0.08], [0.5], [1.2]);
+console.log(out.bid_p, out.ask_p);
+```
+
+### Python
+
+```python
+import bs_p
+
+print(bs_p.healthcheck())
+print(bs_p.sigmoid(0.0))  # 0.5
+print(bs_p.logit(0.5))    # 0.0
+
+out = bs_p.calculate_quotes_logit([0.1], [0.0], [0.2], [0.08], [0.5], [1.2])
+print(out["bid_p"], out["ask_p"])
+```
+
 ## Overview
 
 `polymarket-kernel` implements a unified logit-space stochastic framework where probabilities are transformed into log-odds and processed through SIMD-native math.
