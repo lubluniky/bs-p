@@ -6,12 +6,12 @@ static inline int spsc_is_power_of_two_u64(uint64_t v) {
     return (v != 0u) && ((v & (v - 1u)) == 0u);
 }
 
-static_assert(sizeof(_Atomic uint64_t) <= SPSC_CACHELINE_SIZE,
-              "atomic index must fit in one cache line");
-static_assert(offsetof(spsc_ring_buffer_t, head) % SPSC_CACHELINE_SIZE == 0u,
-              "head must be cacheline aligned");
-static_assert(offsetof(spsc_ring_buffer_t, tail) % SPSC_CACHELINE_SIZE == 0u,
-              "tail must be cacheline aligned");
+_Static_assert(sizeof(_Atomic uint64_t) <= SPSC_CACHELINE_SIZE,
+               "atomic index must fit in one cache line");
+_Static_assert(offsetof(spsc_ring_buffer_t, head) % SPSC_CACHELINE_SIZE == 0u,
+               "head must be cacheline aligned");
+_Static_assert(offsetof(spsc_ring_buffer_t, tail) % SPSC_CACHELINE_SIZE == 0u,
+               "tail must be cacheline aligned");
 
 int spsc_ring_buffer_init(spsc_ring_buffer_t *rb, l2_update_t *slots, uint64_t capacity) {
     if (rb == NULL || slots == NULL) {
