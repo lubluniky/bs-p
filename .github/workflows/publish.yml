@@ -44,7 +44,15 @@ jobs:
       - name: Publish to crates.io
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-        run: cargo publish --manifest-path packages/crates/Cargo.toml
+        shell: bash
+        run: |
+          CRATE_NAME="$(sed -n 's/^name = "\(.*\)"/\1/p' packages/crates/Cargo.toml | head -n 1)"
+          CRATE_VERSION="$(sed -n 's/^version = "\(.*\)"/\1/p' packages/crates/Cargo.toml | head -n 1)"
+          if cargo search "${CRATE_NAME}" --limit 1 | grep -Fq "${CRATE_NAME} = \"${CRATE_VERSION}\""; then
+            echo "Crate ${CRATE_NAME}@${CRATE_VERSION} already published, skipping."
+            exit 0
+          fi
+          cargo publish --manifest-path packages/crates/Cargo.toml
 
   publish-npm:
     needs: detect
@@ -75,7 +83,20 @@ jobs:
           else
             npm install
           fi
+      - name: Check npm version
+        id: npm_exists
+        shell: bash
+        run: |
+          PKG_NAME="$(node -p "require('./package.json').name")"
+          PKG_VERSION="$(node -p "require('./package.json').version")"
+          if npm view "${PKG_NAME}@${PKG_VERSION}" version >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "npm package ${PKG_NAME}@${PKG_VERSION} already exists, skipping."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
       - name: Publish to npmjs
+        if: steps.npm_exists.outputs.exists != 'true'
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npm publish --access public --provenance
@@ -109,7 +130,20 @@ jobs:
           else
             bun install
           fi
+      - name: Check Bun package version
+        id: bun_exists
+        shell: bash
+        run: |
+          PKG_NAME="$(node -p "require('./package.json').name")"
+          PKG_VERSION="$(node -p "require('./package.json').version")"
+          if npm view "${PKG_NAME}@${PKG_VERSION}" version >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "npm package ${PKG_NAME}@${PKG_VERSION} already exists, skipping."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
       - name: Publish with Bun to npmjs
+        if: steps.bun_exists.outputs.exists != 'true'
         env:
           NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: bun publish --access public
@@ -138,3 +172,5 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: packages/python/dist/
+          skip-existing: true
+          verbose: true

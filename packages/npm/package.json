@@ -5,6 +5,10 @@
   "license": "MIT",
   "type": "module",
   "main": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/holypolyfoundation/bs-p"
+  },
   "gypfile": true,
   "files": [
     "index.js",

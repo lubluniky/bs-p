@@ -6,6 +6,10 @@
   "type": "module",
   "module": "index.js",
   "main": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/holypolyfoundation/bs-p"
+  },
   "gypfile": true,
   "files": [
     "index.js",
