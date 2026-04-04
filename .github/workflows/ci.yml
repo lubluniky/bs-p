@@ -1,0 +1,122 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    outputs:
+      has_rust: ${{ steps.detect.outputs.has_rust }}
+      has_node: ${{ steps.detect.outputs.has_node }}
+      has_bun: ${{ steps.detect.outputs.has_bun }}
+      has_python: ${{ steps.detect.outputs.has_python }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: detect
+        shell: bash
+        run: |
+          if [[ -f Cargo.toml ]]; then
+            echo "has_rust=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_rust=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          if [[ -f package.json ]]; then
+            echo "has_node=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_node=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          if [[ -f bun.lock || -f bun.lockb || -f bunfig.toml ]]; then
+            echo "has_bun=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_bun=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          if [[ -f pyproject.toml || -f setup.py ]]; then
+            echo "has_python=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_python=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  rust-build:
+    needs: detect
+    if: needs.detect.outputs.has_rust == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build release
+        run: cargo build --release
+      - name: Run tests
+        run: cargo test --all-targets
+
+  node-build:
+    needs: detect
+    if: needs.detect.outputs.has_node == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install npm dependencies
+        shell: bash
+        run: |
+          if [[ -f package-lock.json ]]; then
+            npm ci
+          else
+            npm install
+          fi
+
+      - name: npm build
+        run: npm run build --if-present
+
+      - name: npm test
+        run: npm test --if-present
+
+      - name: Detect package scripts
+        id: scripts
+        shell: bash
+        run: |
+          node -e "const p=require('./package.json');const s=p.scripts||{};console.log('has_build=' + Boolean(s.build));console.log('has_test=' + Boolean(s.test));" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Bun
+        if: needs.detect.outputs.has_bun == 'true'
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install Bun dependencies
+        if: needs.detect.outputs.has_bun == 'true'
+        shell: bash
+        run: |
+          if [[ -f bun.lock || -f bun.lockb ]]; then
+            bun install --frozen-lockfile
+          else
+            bun install
+          fi
+
+      - name: bun build
+        if: needs.detect.outputs.has_bun == 'true' && steps.scripts.outputs.has_build == 'true'
+        run: bun run build
+
+      - name: bun test
+        if: needs.detect.outputs.has_bun == 'true' && steps.scripts.outputs.has_test == 'true'
+        run: bun test
+
+  python-build:
+    needs: detect
+    if: needs.detect.outputs.has_python == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build sdist/wheel
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build
